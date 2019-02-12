@@ -1,2 +1,2 @@
 # ImageConversionTechniques
-Utilizing and apply gray scale techniques and uniform color quantization on images
+Utilizing and applying gray scale techniques and uniform color quantization on images
