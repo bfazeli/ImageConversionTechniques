@@ -131,13 +131,40 @@ public class API {
         int[][] cb = new int[paddedImg.getW()][paddedImg.getW()];
         int[][] cr = new int[paddedImg.getW()][paddedImg.getW()];
 
-        update(y, cb, cr, paddedImg);
+        populateY_CB_CR(y, cb, cr, paddedImg);
 
 
         return img;
     }
 
-    public static void update(int[][] y, int[][] cb, int[][] cr, MImage img) {
+    public static void populateY_CB_CR(int[][] y, int[][] cb, int[][] cr, MImage img) {
+        int[] pixel = new int[3]; 
+        for(int row = 0; i < img.getW(); i++) {
+            for(int column = 0; j < img.getH(); j++) {
+                // Populate the pixel
+                img.getPixel(row, column, pixel);
+                // Do the nec calculation for each R G B
+                y[row][column] = (.299*pixel[0] + .5870*pixel[1] + .114*pixel[2]) - 128;
+                cb[row][column] = (-.1687*pixel[0] - .3313*pixel[1] + .5000*pixel[2]) - .5;
+                cr[row][column] = (.5*pixel[0] - .4187*pixel[1] - 0.0813*pixel[2]) - .5;
+
+                // Bound y value
+                if (y[row][column] > 255)
+                    y[row][column] = 255;
+                else if (y[row][column] < 0)
+                    y[row][column] = 0;
+                // Bound cb val
+                if (cb[row][columnn] > 127.5)
+                    cb[row][column] = 127.5;
+                else if (cb[row][column] < -127.5)
+                    cb[row][column] = 0;
+                // Bound cr val
+                if (cr[row][columnn] > 127.5)
+                    cr[row][column] = 127.5;
+                else if (cr[row][column] < -127.5)
+                    cr[row][column] = 0;
+            }
+        }        
         
     }
 
