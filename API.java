@@ -184,8 +184,10 @@ public class API {
         } 
     }
 
+    //////////// MARK: - Decoding //////////
     // superSamplingCbCr
-    //  -   Description: Purpose is to retrieve a CbCr prior to the state of subsampling by distributing the avg CbCr values to 4 px
+    //  -   Description: Purpose is to retrieve a CbCr prior to the state of subsampling 
+    //                   by distributing the avg CbCr values to 4 px.
     public static void superSample(int[][] cb, int[][] cr) {
         int [][] auxCb = new int [cb.length][cb[0].length];
         int [][] auxCr = new int [cr.length][cr[0].length];
@@ -210,6 +212,42 @@ public class API {
             for(int column = 0; column < cb[row].length; column++) {
                 cb[row][column] = auxCb[row][column];
                 cr[row][column] = auxCr[row][column];
+            }
+        }
+    }
+
+    // inverseColorTransform
+    //  -   Description: Inverses the color space from yCbCr values to rgb values
+    public static void inverseColorTransform(int[][] y, int[][] cb, int[][] cr, MImage img) {
+        int [] pixel = new int[3];
+        int yVal, cbVal, crVal;
+        for (int row = 0; row < img.getH(); row++) {
+            for (int column = 0; column < img.getW(); column++) {
+                yVal = y[row][column];
+                cbVal = cb[row][column];
+                crVal = cr[row][column];
+                
+                pixel[0] = 1.0*yVal + 0*cbVal + 1.4020*crVal;
+                pixel[1] = 1.0*yVal - 0.3441*cbVal - 0.7141*crVal;
+                pixel[2] = 1.0*yVal + 1.7720*cbVal + 0*crVal;
+
+                // Bound r value
+                if (pixel[0] > 255)
+                    y[row][column] = 255;
+                else if (pixel[0] < 0)
+                    pixel[0] = 0;
+                // Bound g val
+                if (pixel[1] > 255)
+                    pixel[1] = 255;
+                else if (pixel[1]] < 0)
+                    pixel[1] = 0;
+                // Bound b val
+                if (pixel[2] > 255)
+                    pixel[2] = 255;
+                else if (pixel[2] < 255)
+                    pixel[2] = 0;
+
+                img.setPixel(row, column, pixel);
             }
         }
     }
