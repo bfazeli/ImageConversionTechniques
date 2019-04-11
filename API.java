@@ -127,17 +127,22 @@ public class API {
         
         MImage paddedImg = paddImage(img);
 
-        int[][] y = new int[paddedImg.getW()][paddedImg.getH()];
-        int[][] cb = new int[paddedImg.getW()][paddedImg.getW()];
-        int[][] cr = new int[paddedImg.getW()][paddedImg.getW()];
+        int[][] y = new int[paddedImg.getH()][paddedImg.getW()];
+        int[][] cb = new int[paddedImg.getH()][paddedImg.getW()];
+        int[][] cr = new int[paddedImg.getH()][paddedImg.getW()];
+        int[][] subSampledCb = new int[paddedImg.getH()][paddedImg.getW()];
+        int[][] subSampledCr = new int[paddedImg.getH()][paddedImg.getW()];
 
-        populateY_CB_CR(y, cb, cr, paddedImg);
+        colorSpaceTransformation(y, cb, cr, paddedImg);
+        subSampleCbCr(cb, cr, subSampledCb, subSampledCr);
 
 
         return img;
     }
 
-    public static void populateY_CB_CR(int[][] y, int[][] cb, int[][] cr, MImage img) {
+    // colorSpaceTransformation
+    //  -   Description: Transforms each pixel from RGB to YCbCr using the conversion eq
+    public static void colorSpaceTransformation(int[][] y, int[][] cb, int[][] cr, MImage img) {
         int[] pixel = new int[3]; 
         for(int row = 0; i < img.getW(); i++) {
             for(int column = 0; j < img.getH(); j++) {
@@ -166,6 +171,17 @@ public class API {
             }
         }        
         
+    }
+
+    // subSampleCbCr
+    //  -   Description: Since Cb & Cr vals aren't nearly as important as Y val we reduce it by using 4:2:0 (MPEG1) chrominance subsampling scheme. 
+    public static void subSampleCbCr(int[][] origCb, int[][] origCr, int[][] newCb, int[][] newCr){
+        for(int row = 0; row < origCb.length - 1; row += 2) {
+            for(int column = 0; column < origCb.length - 1; column += 2) {
+                newCb[row][column] = (origCb[row][column] + origCb[row][column+1] + origCb[row+1][column] + origCb[row+1][column+1]) / 4.0;
+                newCr[row][column] = (origCr[row][column] + origCr[row][column+1] + origCr[row+1][column] + origCr[row+1][column+1]) / 4.0;
+            }
+        } 
     }
 
     public static MImage paddImage(MImage img) {
