@@ -184,6 +184,36 @@ public class API {
         } 
     }
 
+    // superSamplingCbCr
+    //  -   Description: Purpose is to retrieve a CbCr prior to the state of subsampling by distributing the avg CbCr values to 4 px
+    public static void superSample(int[][] cb, int[][] cr) {
+        int [][] auxCb = new int [cb.length][cb[0].length];
+        int [][] auxCr = new int [cr.length][cr[0].length];
+
+        // Perform a deep copy of cb cr
+        for (int row = 0; row < cb.length - 1; row += 2) {
+            for (int column = 0; column < cb[row].length - 1; column += 2) {
+                auxCb[row][column] = cb[row][column];
+                auxCb[row][column+1] = cb[row][column];
+                auxCb[row+1][column] = cb[row][column;
+                auxCb[row+1][column+1] = cb[row][column];
+                auxCr[row][column] = cr[row][column];
+                auxCr[row][column+1] = cr[row][column];
+                auxCr[row+1][column] = cr[row][column];
+                auxCr[row+1][column+1] = cr[row][column]; 
+            
+            }
+        }
+
+        // Reassign the auxCbCr distributions to the cb and cr passed in
+        for (int row = 0; row < cb.length; row++) {
+            for(int column = 0; column < cb[row].length; column++) {
+                cb[row][column] = auxCb[row][column];
+                cr[row][column] = auxCr[row][column];
+            }
+        }
+    }
+
     public static MImage paddImage(MImage img) {
         int width = img.getW();
         int height = img.getH();
