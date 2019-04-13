@@ -37,6 +37,10 @@ public class CS4551_Fazeli {
 			case 1:
 				break;
 			case 2:
+				api.setCompressionValue(reader);
+				api.performDCT(img);
+				MImage decodedImg = api.performInverseDCT();
+				decodedImg.write2PPM(api.compVal + "-" + imgName + ".ppm");
 				break;	
 			case 3:
 				api.convertImgToGrayScaleImg(img);
