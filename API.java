@@ -8,123 +8,26 @@
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
 import java.util.Scanner;
+import java.util.Set;
+
+import javafx.util.Pair;
 
 public class API {
 
     public int compVal;
     private int newH, newW;
     private int heightO, widthO;
-    private boolean width_padded = false;
-    private boolean height_padded = false;
 
     private int[][][] y8x8, cb8x8, cr8x8;
 
-    private int getGrayScaleValueFor(int[] rgb) {
-        int gray = (int) Math.round(0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]);
-
-        if (gray > 255) {
-            return 255;
-        } else if (gray < 0) {
-            return 0;
-        }
-
-        return gray;
-    }
-
-    private int getGrayScaleValueFor8bitConversion(int[] rgb) {
-
-        return (Integer.parseInt(String.format("%3s", Integer.toBinaryString(rgb[0] / 32)).replace(' ', '0')
-                + String.format("%3s", Integer.toBinaryString(rgb[1] / 32)).replace(' ', '0')
-                + String.format("%2s", Integer.toBinaryString(rgb[2] / 64)).replace(' ', '0'), 2));
-    }
-
-    public void convertImgToGrayScaleImg(MImage img) {
-        int grayScaleValue;
-        int height = img.getH(), width = img.getW();
-        int[] current_rgb = new int[3];
-
-        for (int row = 0; row < width; ++row) {
-            for (int column = 0; column < height; ++column) {
-                img.getPixel(row, column, current_rgb);
-                grayScaleValue = getGrayScaleValueFor(current_rgb);
-                img.setPixel(row, column, new int[] { grayScaleValue, grayScaleValue, grayScaleValue });
-            }
-        }
-    }
-
-    public void convertImgToQuantized(MImage img, int[][] lut) {
-
-        int height = img.getH(), width = img.getW();
-        int[] current_rgb = new int[3];
-
-        for (int row = 0; row < width; ++row) {
-            for (int column = 0; column < height; ++column) {
-                img.getPixel(row, column, current_rgb);
-                img.setPixel(row, column,
-                        new int[] { lut[current_rgb[0]][0], lut[current_rgb[0]][1], lut[current_rgb[0]][2] });
-            }
-        }
-    }
-
-    public void convertImgToGrayScaleIndex(MImage img) {
-        int grayScaleValue;
-        int height = img.getH(), width = img.getW();
-        int[] current_rgb = new int[3];
-
-        for (int row = 0; row < width; ++row) {
-            for (int column = 0; column < height; ++column) {
-                img.getPixel(row, column, current_rgb);
-                grayScaleValue = getGrayScaleValueFor8bitConversion(current_rgb);
-                img.setPixel(row, column, new int[] { grayScaleValue, grayScaleValue, grayScaleValue });
-            }
-        }
-    }
-
     public int getInputFromUser(Scanner reader) {
         System.out.print("Main Menu-----------------------------------\n" + "1. VQ (Vector Quantization)\n"
-                + "2. DCT-based Coding\n" + "3. Conversion to Gray-scale Image (24bits->8bits)\n"
-                + "4. Conversion to 8bit Indexed Color Image using Uniform Color\n"
-                + "   Quantization (24bits->8bits)\n" + "5. Quit\n" + "\nPlease enter the task number [1-3]: ");
+                + "2. DCT-based Coding\n" + "3. Quit\n" + "\nPlease enter the task number [1-3]: ");
         return reader.nextInt();
-    }
-
-    public void setCompressionValue(Scanner reader) {
-        do {
-            System.out.print("Give value of n [0-5]: ");
-            compVal = reader.nextInt();
-        } while ((compVal < 0 || compVal > 5));
-    }
-
-    public void generateLUT(int[][] lut) {
-        String bits, padding = "";
-
-        HashMap<String, Integer> rgb = new HashMap<>();
-        rgb.put("red", 0);
-        rgb.put("green", 0);
-        rgb.put("blue", 0);
-
-        System.out.println("\nLUT by UCQ");
-        System.out.println("Index\t\tR\t  G \t    B");
-        System.out.println("-------------------------------------------");
-        for (int i = 0; i < 256; i++) {
-            bits = Integer.toBinaryString(i);
-
-            for (int j = 0; j < (8 - bits.length()); j++) {
-                padding += "0";
-            }
-
-            bits = padding + bits;
-
-            lut[i][0] = (Integer.parseInt(bits.substring(0, 3), 2) * 32 + 16);
-            lut[i][1] = (Integer.parseInt(bits.substring(3, 6), 2) * 32 + 16);
-            lut[i][2] = (32 * ((Integer.parseInt(bits.substring(6, 8), 2) * 2 + 1)));
-
-            System.out.println(String.format("%-3s%15s%10s%10s", i, lut[i][0], lut[i][1], lut[i][2]));
-
-            padding = "";
-
-        }
     }
 
     // // TASK 1
@@ -135,34 +38,42 @@ public class API {
     //
     //
     //
-    // 
+    //
     public void performVQ(String imgName) {
         MImage img = new MImage(imgName);
         MImage paddedImage = paddOrigImage(img);
-        
 
+        ArrayList<int[]> vectors = getVectorsFromImg(paddedImage);
+
+        Pair<int[][], int[]> clustersAndClosestCluster = kMeansClustering(vectors);
+        printClusters(clustersAndClosestCluster.getKey());
+
+        MImage vqImage = quantizationWithCodebook(paddedImage.getW(), paddedImage.getH(),
+                clustersAndClosestCluster.getValue());
+        String newName = "vq" + imgName + ".ppm";
+        vqImage.write2PPM(newName);
+
+        decodeVQ(clustersAndClosestCluster.getKey(), newName);
     }
 
     public MImage paddOrigImage(MImage img) {
-        
+
         int width = img.getW();
         int height = img.getH();
         int origWidth = width;
         int origHeight = height;
 
-        //If a dimension is not even, pad
+        // If a dimension is not even, pad
         if (width % 2 != 0) {
             width++;
-            width_padded = true;
         }
         if (height % 2 != 0) {
             height++;
-            height_padded = true;
         }
 
-        //Create a new image with padding
+        // Create a new image with padding
         MImage paddedImg = new MImage(width, height);
-        //Pass the info in the old image into the new one
+        // Pass the info in the old image into the new one
         int[] rgb = new int[3];
         for (int i = 0; i < origHeight; i++) {
             for (int j = 0; j < origWidth; j++) {
@@ -174,12 +85,12 @@ public class API {
         return paddedImg;
     }
 
-    public static ArrayList<int[]> convertImageToInputVectors(MImage img) {
-        //Loop through the pixels 2X2
+    public static ArrayList<int[]> getVectorsFromImg(MImage img) {
+        // Loop through the pixels 2X2
         int[] rgb = new int[3];
 
         ArrayList<int[]> vectors = new ArrayList<>();
-        int [] vector = new int[12];
+        int[] vector = new int[12];
 
         for (int row = 0, height = img.getH(); row < height - 1; row += 2) {
             for (int column = 0, width = img.getW(); column < width - 1; column += 2) {
@@ -207,20 +118,217 @@ public class API {
         return vectors;
     }
 
+    private Pair<int[][], int[]> kMeansClustering(ArrayList<int[]> vectors) {
+        // Create a 2D array with 256 X 12 elements (Clusters)
+        int clusters[][] = new int[256][12];
 
+        int[] closestCluster = null;
+        Random rand = new Random();
+        for (int i = 0; i < 256; i++) {
+            for (int j = 0; j < 12; j++) {
+                clusters[i][j] = rand.nextInt(256);
+            }
+        }
 
+        Map<Integer, List<Integer>> prevNearestMap = null;
+        for (int run = 0; run < 100; run++) {
+
+            closestCluster = nearestCluster(vectors, clusters);
+
+            // Map the closest cluster with their location
+            Map<Integer, List<Integer>> nearestMap = new HashMap();
+
+            // Add the closestCluster to the nearestClusterMap
+            for (int i = 0; i < closestCluster.length; i++) {
+                if (nearestMap.containsKey(closestCluster[i])) {
+                    List<Integer> x = nearestMap.get(closestCluster[i]);
+                    x.add(i);
+                    nearestMap.put(closestCluster[i], x);
+
+                } // If not, insert new arraylist
+                else {
+                    List<Integer> x = new ArrayList();
+                    x.add(i);
+                    nearestMap.put(closestCluster[i], x);
+                }
+
+            }
+
+            // Find the average per cluster and update the centroid
+            Set<Map.Entry<Integer, List<Integer>>> set = nearestMap.entrySet();
+
+            for (Map.Entry<Integer, List<Integer>> entry : set) {
+
+                List<Integer> currentCluster = entry.getValue();
+                int[] sum = new int[12];
+
+                for (int i = 0; i < currentCluster.size(); i++) {
+                    int[] currentVector = vectors.get(currentCluster.get(i));
+                    for (int j = 0; j < 12; j++) {
+                        sum[j] += currentVector[j];
+                    }
+                }
+
+                for (int i = 0; i < 12; i++) {
+                    sum[i] = sum[i] / currentCluster.size();
+                }
+
+                clusters[entry.getKey()] = sum;
+            }
+
+            // If no change, break
+            if (prevNearestMap != null && prevNearestMap.equals(nearestMap)) {
+                break;
+            }
+
+            prevNearestMap = new HashMap(nearestMap);
+
+            // Clear map
+            nearestMap.clear();
+        }
+
+        return new Pair<int[][], int[]>(clusters, closestCluster);
+    }
+
+    public static int euclideanDistance(int[] list1, int[] list2) {
+        int distance = 0;
+
+        for (int i = 0; i < list1.length; i++) {
+            distance += Math.pow((list1[i] - list2[i]), 2);
+        }
+        distance = (int) Math.sqrt(distance);
+        return distance;
+    }
+
+    public static int[] nearestCluster(ArrayList<int[]> vectors, int[][] clusters) {
+        int[] closestCluster = new int[vectors.size()];
+        for (int i = 0, size = vectors.size(); i < size; i++) {
+            int[] x = vectors.get(i);
+
+            int indexOfClosestCluster = -1;
+            double shortestDistance = 1000000000;
+
+            for (int j = 0; j < clusters.length; j++) {
+                int[] currentCluster = clusters[j];
+
+                double distance = euclideanDistance(x, currentCluster);
+
+                if (shortestDistance > distance) {
+                    shortestDistance = distance;
+                    indexOfClosestCluster = j;
+                }
+            }
+
+            closestCluster[i] = indexOfClosestCluster;
+        }
+        return closestCluster;
+    }
+
+    private void printClusters(int[][] clusters) {
+        for (int i = 0; i < clusters.length; i++) {
+            System.out.println("Cluster " + (i + 1) + ": " + Arrays.toString(clusters[i]));
+        }
+    }
+
+    private MImage quantizationWithCodebook(int width, int height, int[] closestCluster) {
+        // New quantization algorithm
+        // Create a new image with half the width and height of the input padded image
+        width = width / 2;
+        height = height / 2;
+        MImage img = new MImage(width, height);
+
+        // Loop through the input vectors
+        int[] rgb = new int[3];
+
+        for (int row = 0; row < height - 1; row += 2) {
+            for (int column = 0; column < width - 1; column += 2) {
+                rgb[0] = closestCluster[0];
+                rgb[1] = closestCluster[1];
+                rgb[2] = closestCluster[2];
+                img.setPixel(column, row, rgb);
+                rgb[3] = closestCluster[0];
+                rgb[4] = closestCluster[1];
+                rgb[5] = closestCluster[2];
+                img.setPixel(column, row, rgb);
+                rgb[6] = closestCluster[0];
+                rgb[7] = closestCluster[1];
+                rgb[8] = closestCluster[2];
+                img.setPixel(column, row, rgb);
+                rgb[9] = closestCluster[0];
+                rgb[10] = closestCluster[1];
+                rgb[11] = closestCluster[2];
+                img.setPixel(column, row, rgb);
+            }
+        }
+
+        return img;
+    }
+
+    public static void decodeVQ(int[][] clusters, String imgName) {
+        // New decode algorithm
+        // Create an image 2 times the size of the input image
+        MImage img = new MImage(imgName);
+        int width = img.getW();
+        int height = img.getH();
+
+        ArrayList<int[]> vectors = new ArrayList();
+        // Loop through the image
+        int[] rgb = new int[3];
+        for (int i = 0; i < height; i++) {
+            for (int j = 0; j < width; j++) {
+                img.getPixel(j, i, rgb);
+                vectors.add(clusters[rgb[0]]);
+            }
+        }
+
+        // Convert the output vectors into an image
+        MImage decodedImg = new MImage(width * 2, height * 2);
+
+        int x = 0, y = 0;
+        boolean end = false;
+
+        for (int index = 0; index < vectors.size() && !end; index++) {
+            for (int i = 0; i < 12 && !end; i += 3) {
+                rgb[0] = vectors.get(index)[i];
+                rgb[1] = vectors.get(index)[i + 1];
+                rgb[2] = vectors.get(index)[i + 2];
+
+                decodedImg.setPixel(x, y, rgb);
+
+                x++;
+
+                if (y >= decodedImg.getH() - 1) {
+                    end = true;
+                } else if (x >= decodedImg.getW() - 1 && y < decodedImg.getH()) {
+                    x = 0;
+                    y++;
+                }
+
+            }
+        }
+
+        // Save the image.
+        decodedImg.write2PPM("decoded_" + imgName);
+    }
 
     // // TASK 2
-    // 
-    // 
-    // 
-    // 
-    // 
-    // 
-    // 
-    // 
-    // 
-    // 
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    public void setCompressionValue(Scanner reader) {
+        do {
+            System.out.print("Give value of n [0-5]: ");
+            compVal = reader.nextInt();
+        } while ((compVal < 0 || compVal > 5));
+    }
+
     public void performDCT(MImage img) {
 
         MImage paddedImg = paddImage(img);
@@ -248,16 +356,13 @@ public class API {
     public MImage performInverseDCT() {
         deQuantization(y8x8, cb8x8, cr8x8);
 
-        int [][] decodedY = expandTo2D(inverseTransform(y8x8));
-        int [][] decodedCb = expandTo2D(inverseTransform(cb8x8));
-        int [][] decodedCr = expandTo2D(inverseTransform(cr8x8));
-
-        System.out.println(Arrays.toString(decodedY[decodedY.length-1]));
+        int[][] decodedY = expandTo2D(inverseTransform(y8x8));
+        int[][] decodedCb = expandTo2D(inverseTransform(cb8x8));
+        int[][] decodedCr = expandTo2D(inverseTransform(cr8x8));
 
         superSample(decodedCb, decodedCr);
 
         MImage decodedImage = new MImage(widthO, heightO);
-        System.out.println(decodedY[0].length + " " + decodedCb[0].length + " " + decodedCr[0].length);
 
         inverseColorTransform(decodedY, decodedCb, decodedCr, decodedImage);
 
@@ -421,7 +526,8 @@ public class API {
                             } else {
                                 cv = 1;
                             }
-                            summation += cu * cv * blocks[i][u][v] * Math.cos((((2 * x) + 1) * u * Math.PI) / 16) * Math.cos((((2 * y) + 1) * v * Math.PI) / 16);
+                            summation += cu * cv * blocks[i][u][v] * Math.cos((((2 * x) + 1) * u * Math.PI) / 16)
+                                    * Math.cos((((2 * y) + 1) * v * Math.PI) / 16);
                         }
                     }
                     summation /= 4;
@@ -539,23 +645,16 @@ public class API {
 
         for (int row = 0, newRow = 0; row < cb.length - 1; row += 2, newRow++) {
             for (int column = 0, newColumn = 0; column < cb[row].length - 1; column += 2, newColumn++) {
-                auxCb[newRow][newColumn] = 
-                    (int) ((cb[row][column] 
-                    + cb[row][column + 1] 
-                    + cb[row + 1][column] 
-                    + cb[row + 1][column + 1]) / 4.0);
-                auxCr[newRow][newColumn] = 
-                    (int) ((cr[row][column] 
-                    + cr[row][column + 1] 
-                    + cr[row + 1][column] 
-                    + cr[row + 1][column + 1]) / 4.0);
+                auxCb[newRow][newColumn] = (int) ((cb[row][column] + cb[row][column + 1] + cb[row + 1][column]
+                        + cb[row + 1][column + 1]) / 4.0);
+                auxCr[newRow][newColumn] = (int) ((cr[row][column] + cr[row][column + 1] + cr[row + 1][column]
+                        + cr[row + 1][column + 1]) / 4.0);
             }
         }
 
         cb = auxCb;
         cr = auxCr;
     }
-
 
     //////////// MARK: - Decoding //////////
     // superSamplingCbCr
@@ -575,14 +674,6 @@ public class API {
                 auxCb[row + 1][column + 1] = cb[i][j];
             }
         }
-
-        // Reassign the auxCbCr distributions to the cb and cr passed in
-        // for (int row = 0; row < cb.length; row++) {
-        //     for (int column = 0; column < cb[row].length; column++) {
-        //         cb[row][column] = auxCb[row][column];
-        //         cr[row][column] = auxCr[row][column];
-        //     }
-        // }
 
         cb = auxCb;
         cr = auxCr;
@@ -620,18 +711,10 @@ public class API {
                 else if (pixel[2] < 0)
                     pixel[2] = 0;
 
-                // System.out.println(Arrays.toString(pixel));
-
-                // img.getPixel(row, column, prevPixel);
-                // System.out.println("prev: " + Arrays.toString(prevPixel));
-
                 newImg.setPixel(column, row, pixel);
-                // System.out.println("new: " + Arrays.toString(pixel));
 
             }
-            System.out.print(Arrays.toString(pixel));
         }
-        System.out.println();
     }
 
     private MImage paddImage(MImage img) {
@@ -640,18 +723,15 @@ public class API {
 
         if (widthO % 8 != 0) {
             newW = (widthO / 8 + 1) * 8;
-            System.out.println("width_padded:" + newW);
         }
         if (heightO % 8 != 0) {
             newH = (heightO / 8 + 1) * 8;
-            System.out.println("height_padded:" + newH);
         }
 
         MImage paddedImg = new MImage(newW, newH);
 
         int[] rgb = new int[3];
 
-        // Copy the pixels from img to the new paddedImg
         for (int i = 0; i < heightO; i++) {
             for (int j = 0; j < widthO; j++) {
                 img.getPixel(j, i, rgb);
